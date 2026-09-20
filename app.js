@@ -167,6 +167,43 @@ function badgesOf(id) {
 }
 function badgesHtml(id) { var bs = badgesOf(id), got = bs.filter(function (b) { return b.on; }).length; return '<section class="stack"><div class="sec"><h2>나의 배지</h2><span class="s13 mute">' + got + ' / ' + bs.length + '</span></div><div class="px" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">' + bs.map(function (b) { return '<div class="card" style="padding:12px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;' + (b.on ? '' : 'opacity:.4') + '"><span style="width:40px;height:40px;border-radius:50%;background:' + (b.on ? 'var(--sun)' : 'var(--mint)') + ';color:var(--ink);display:flex;align-items:center;justify-content:center">' + ic(b.icon, 20) + '</span><span class="s12 b">' + b.name + '</span></div>'; }).join('') + '</div></section>'; }
 
+/* ---------- 카톡 등 인앱 브라우저 탈출 · 홈 화면 설치 ---------- */
+var UA = navigator.userAgent || '';
+var IS_IOS = /iPhone|iPad|iPod/i.test(UA), IS_ANDROID = /Android/i.test(UA);
+var IS_KAKAO = /KAKAOTALK/i.test(UA);
+var IS_INAPP = IS_KAKAO || /NAVER\(inapp|BAND\/|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(UA);
+var IS_STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+var SITE_URL = 'https://www.3050club.co.kr/';
+var deferredInstall = null;
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; var c = document.getElementById('installCard'); if (c) c.style.display = ''; });
+window.addEventListener('appinstalled', function () { deferredInstall = null; try { localStorage.setItem('c3050_installed', '1'); } catch (e) { } var c = document.getElementById('installCard'); if (c) c.remove(); toast('홈 화면에 추가되었습니다'); });
+if ('serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { }); }); }
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+function openExternal() {
+  if (IS_KAKAO) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(SITE_URL); return; }
+  if (IS_ANDROID) { location.href = 'intent://www.3050club.co.kr/#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end'; return; }
+  copyText(SITE_URL, '주소를 복사했습니다. 사파리를 열고 주소창에 붙여넣어 주세요');
+}
+function inAppBar() {
+  if (!IS_INAPP) return '';
+  return '<div style="background:var(--ink);color:#fff;padding:12px 20px;display:flex;flex-direction:column;gap:8px"><div class="s13"><b>' + (IS_KAKAO ? '카카오톡' : '앱') + ' 안에서 보고 계십니다.</b> 이 창은 ' + (IS_KAKAO ? '카톡' : '앱') + '을 닫으면 함께 닫히고 로그인도 유지되지 않습니다.</div><button class="btn sun sm" data-act="openExternal">' + ic('arrow', 16) + (IS_IOS ? '사파리로 열고 홈 화면에 저장하기' : '인터넷 앱으로 열고 홈 화면에 저장하기') + '</button></div>';
+}
+function installCard() {
+  if (IS_STANDALONE || IS_INAPP || lsGet('c3050_installed') === '1') return '';
+  var snooze = Number(lsGet('c3050_install_later') || 0); if (Date.now() - snooze < 7 * 86400000) return '';
+  if (!IS_IOS && !IS_ANDROID) return '';
+  return '<section class="px card rv" id="installCard" style="padding:16px;display:flex;flex-direction:column;gap:10px"><div class="row" style="gap:12px"><img src="icon-192.png" alt="" style="width:52px;height:52px;border-radius:14px;border:1px solid var(--line)"><div class="grow"><div class="b">휴대폰 홈 화면에 저장하기</div><div class="s13 mute">앱처럼 아이콘을 눌러 바로 열 수 있습니다. 설치 파일이 아니라 바로가기라 용량을 차지하지 않습니다.</div></div></div><div class="row"><button class="btn grow" data-act="installApp">' + ic('plus', 16) + '홈 화면에 추가</button><button class="btn ghost" data-act="installLater">나중에</button></div></section>';
+}
+function installGuide() {
+  var steps = IS_IOS
+    ? ['화면 아래 가운데의 <b>공유 버튼</b>(네모에서 화살표가 위로 나온 모양)을 누릅니다.', '목록을 아래로 내려 <b>홈 화면에 추가</b>를 누릅니다.', '오른쪽 위 <b>추가</b>를 누르면 홈 화면에 3050클럽 아이콘이 생깁니다.']
+    : /SamsungBrowser/i.test(UA)
+      ? ['화면 아래 오른쪽의 <b>줄 3개(≡) 메뉴</b>를 누릅니다.', '<b>현재 페이지 추가</b> → <b>홈 화면</b>을 누릅니다.', '<b>추가</b>를 누르면 홈 화면에 3050클럽 아이콘이 생깁니다.']
+      : ['화면 오른쪽 위의 <b>점 3개(⋮) 메뉴</b>를 누릅니다.', '<b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 누릅니다.', '<b>추가(설치)</b>를 누르면 홈 화면에 3050클럽 아이콘이 생깁니다.'];
+  sheet('<h3>홈 화면에 저장하는 방법</h3><p class="s13 mute">' + (IS_IOS ? '아이폰 사파리' : /SamsungBrowser/i.test(UA) ? '삼성 인터넷' : '크롬') + ' 기준입니다. 한 번만 해 두면 다음부터는 아이콘만 누르면 됩니다.</p><div class="stack" style="gap:12px">' + steps.map(function (s, i) { return '<div class="row" style="align-items:flex-start;gap:12px"><span style="width:32px;height:32px;border-radius:50%;background:var(--sun);color:var(--ink);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (i + 1) + '</span><span style="padding-top:4px">' + s + '</span></div>'; }).join('') + '</div><button class="btn block" data-act="closeSheet">확인</button>');
+}
+
 /* ---------- 공통 UI ---------- */
 function header(t1, t2, dark) {
   return '<header class="top' + (dark ? ' dark' : '') + '"><img src="assets/logo.svg" alt="3050파크골프클럽 로고"><div class="tt"><div class="t1">' + t1 + '</div><div class="t2">' + t2 + '</div></div>' +
@@ -197,7 +234,7 @@ var cdTimer;
 function vHome() {
   var ev = upcoming()[0], h = header('3050 파크골프클럽', '30 · 40 · 50 파크골프를 사랑하는 분들의 모임');
   h += '<main><section class="px hero rv"><img src="assets/group.jpg" alt="정기월례회 단체 사진"><div class="in"><div class="row" style="gap:6px"><span class="chip sun">젊은 파크골프</span><span class="chip w">NEW CONCEPT</span></div><h1>함께 치면<br>더 즐겁다, 3050</h1><div class="row" style="gap:8px">' +
-    (S.me ? '<button class="btn w grow" data-act="go" data-tab="talk">소통하러 가기</button>' : '<button class="btn w grow" data-act="join">가입 신청</button>') + '<button class="btn sun grow" data-act="go" data-tab="meet">월례회 보기' + ic('arrow', 16) + '</button></div></div></section>';
+    (S.me ? '<button class="btn w grow" data-act="go" data-tab="talk">소통하러 가기</button>' : '<button class="btn w grow" data-act="join">가입 신청</button>') + '<button class="btn sun grow" data-act="go" data-tab="meet">월례회 보기' + ic('arrow', 16) + '</button></div></div></section>' + installCard();
   if (ev) {
     h += '<section class="px next rv" id="nextcard"><div class="row" style="justify-content:space-between"><span class="s13 b" style="color:#CFE6D6">다음 월례회</span><span class="chip sun">' + dday(ev.date) + '</span></div><div><div class="disp" style="font-size:28px;line-height:1.2">' + esc(ev.title) + '</div><div class="row s13" style="gap:6px;color:#E6F1E8;margin-top:6px">' + ic('clock', 16) + fdate(ev.date) + '</div><div class="row s13" style="gap:6px;color:#E6F1E8;margin-top:4px">' + ic('pin', 16) + esc(ev.place || '장소 추후 공지') + '</div></div>' +
       '<div class="cd" data-cd="' + esc(ev.date) + '"><div><b>--</b><span>일</span></div><div><b>--</b><span>시간</span></div><div><b>--</b><span>분</span></div><div><b>--</b><span>초</span></div></div><div id="homeRsvp"></div></section>';
@@ -389,7 +426,7 @@ function afterMy() {
       '<section class="stack"><div class="sec"><h2>회비 납부 현황</h2></div><div class="px card" style="padding:16px;display:flex;flex-direction:column;gap:12px"><div class="row" style="justify-content:space-between"><div><div class="b">가입비' + (joinFee() ? ' ' + esc(joinFee()) : '') + '</div><div class="s12 mute">회원가입 시 1회 납부</div></div><span class="chip ' + (S.me.joinPaid ? '' : 'rose') + '">' + (S.me.joinPaid ? '납부 완료' : '입금 확인 전') + '</span></div>' + (myPays.length ? myPays.map(function (x) { return '<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:12px"><div><div class="b">' + esc(x.e.title) + '</div><div class="s12 mute">' + fshort(x.e.date) + (x.e.fee ? ' · 참가비 ' + esc(x.e.fee) : '') + '</div></div><span class="chip ' + (x.r.paid ? '' : 'rose') + '">' + (x.r.paid ? '납부 완료' : '입금 확인 전') + '</span></div>'; }).join('') : '<p class="s13 mute" style="border-top:1px solid var(--line);padding-top:12px">참석 신청한 월례회가 없습니다. 참가비는 월례회 참석 신청자만 납부합니다.</p>') + accountBox('입금 후 운영진이 확인하면 납부 현황에 반영됩니다') + '</div></section>' +
       badgesHtml(S.me.id) +
       '<section class="stack"><div class="sec"><h2>회원 명부</h2><span class="s13 mute">전체 ' + S.members.filter(function (m) { return m.status === 'approved'; }).length + '명</span></div><div class="px card row" style="padding:0 14px;border-radius:16px"><span class="mute">' + ic('search', 18) + '</span><label class="sr" for="mq">회원 검색</label><input id="mq" class="grow" style="min-height:48px;border:0;background:transparent;outline:none" placeholder="이름으로 회원 찾기" value="' + esc(q) + '"></div><div class="px card" style="padding:4px 16px" id="mlist">' + memberRows(list) + '</div></section>' +
-      '<div class="px row"><a class="btn ghost grow" href="' + CLUB.band + '" target="_blank" rel="noopener">밴드 바로가기</a><button class="btn ghost grow" data-act="logout">' + ic('out', 18) + '로그아웃</button></div>' + footer();
+      (IS_STANDALONE ? '' : '<div class="px"><button class="btn ghost block" data-act="' + (IS_INAPP ? 'openExternal' : 'installApp') + '">' + ic('plus', 16) + '휴대폰 홈 화면에 저장하기</button></div>') + '<div class="px row"><a class="btn ghost grow" href="' + CLUB.band + '" target="_blank" rel="noopener">밴드 바로가기</a><button class="btn ghost grow" data-act="logout">' + ic('out', 18) + '로그아웃</button></div>' + footer();
     reveal();
     var inp = document.getElementById('mq'); inp.addEventListener('input', function () { S.sub.mq = inp.value; var qq = inp.value.trim(); document.getElementById('mlist').innerHTML = memberRows(S.members.filter(function (m) { return m.status === 'approved' && (!qq || m.name.indexOf(qq) >= 0); })); });
   });
@@ -543,6 +580,9 @@ var ACT = {
       return Store.get('events', ev.id).then(function (cur) { delete cur.id; cur.scores = sc; cur.done = true; if (hio.length) cur.hio = hio.join(', '); return Store.set('events', ev.id, cur); }).then(function () { toast('결과를 확정했습니다'); notify('all', 'result', '월례회 결과 발표', ev.title + ' 결과가 확정되었습니다. 랭킹에서 순위를 확인하세요.', 'rank', ev.id); return loadCore().then(function () { S.tab = 'rank'; S.sub.rank = 'ev'; S.sub.rankEv = ev.id; S.eventId = null; render(); }); });
     });
   },
+  openExternal: function () { openExternal(); },
+  installApp: function () { if (deferredInstall) { deferredInstall.prompt(); deferredInstall.userChoice.then(function (r) { if (r.outcome === 'accepted') lsSet('c3050_installed', '1'); deferredInstall = null; }); } else installGuide(); },
+  installLater: function () { lsSet('c3050_install_later', String(Date.now())); var c = document.getElementById('installCard'); if (c) c.remove(); },
   notifOpen: function () {
     var list = S.notifs || [], seen = S.me.notifSeenAt || 0, perm = ('Notification' in window) ? Notification.permission : 'unsupported';
     sheet('<h3>알림</h3>' + (perm === 'default' ? '<button class="btn ghost block" data-act="notifPerm">' + ic('bell', 16) + '이 기기에서 알림 팝업 받기</button><p class="s12 mute">홈페이지를 열어 둔 동안 새 알림이 오면 기기 알림으로 알려드립니다.</p>' : '') + (list.length ? '<div class="stack" style="gap:0">' + list.map(function (n) { var nw = n.at > seen && n.by !== S.me.id; return '<button class="row" style="padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;width:100%;text-align:left;align-items:flex-start" data-act="notifGo" data-tab="' + esc(n.tab || 'home') + '" data-ev="' + esc(n.eventId || '') + '"><span style="width:40px;height:40px;border-radius:12px;background:' + (nw ? 'var(--sun)' : 'var(--mint)') + ';color:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0">' + ic(NICON[n.type] || 'bell', 20) + '</span><span class="grow"><span class="b" style="display:block">' + esc(n.title) + (nw ? ' <span class="chip red" style="padding:1px 7px">새 알림</span>' : '') + '</span><span class="s13" style="display:block">' + esc(n.body || '') + '</span><span class="s12 mute">' + ago(n.at) + '</span></span></button>'; }).join('') + '</div>' : '<p class="mute" style="text-align:center;padding:30px 0">아직 도착한 알림이 없습니다.</p>'));
@@ -611,7 +651,7 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { cl
 var VIEWS = { home: [vHome, afterHome], meet: [vMeet, afterMeet], rank: [vRank], talk: [vTalk, afterTalk], my: [vMy, afterMy], admin: [vAdmin, afterAdmin] };
 var io;
 function reveal() { if (!('IntersectionObserver' in window)) return document.querySelectorAll('.rv').forEach(function (n) { n.classList.add('in'); }); io = io || new IntersectionObserver(function (es) { es.forEach(function (x) { if (x.isIntersecting) { x.target.classList.add('in'); io.unobserve(x.target); } }); }, { rootMargin: '0px 0px -30px 0px' }); document.querySelectorAll('.rv:not(.in)').forEach(function (n, i) { n.style.transitionDelay = Math.min(i, 6) * 40 + 'ms'; io.observe(n); }); }
-function render(keep) { var y = window.scrollY, v = VIEWS[S.tab] || VIEWS.home; swapSel = null; $app.innerHTML = demoBar() + v[0]() + navbar(); if (v[1]) v[1](); reveal(); if (keep === true) window.scrollTo(0, y); }
+function render(keep) { var y = window.scrollY, v = VIEWS[S.tab] || VIEWS.home; swapSel = null; $app.innerHTML = demoBar() + inAppBar() + v[0]() + navbar(); if (v[1]) v[1](); reveal(); if (keep === true) window.scrollTo(0, y); }
 
 Store = DEMO ? LocalStore() : FireStore();
 Store.init().then(function () { return Store.getSession(); }).then(function (mid) { return mid ? Store.get('members', mid) : null; }).then(function (m) { if (m && m.status === 'approved') S.me = m; return loadCore(); }).then(render).catch(function (err) { console.error(err); $app.innerHTML = '<div style="padding:60px 24px;text-align:center"><h1 class="disp" style="font-size:24px;color:var(--g)">연결에 문제가 있습니다</h1><p class="mute" style="margin-top:8px">잠시 후 다시 시도해 주세요. 문제가 계속되면 firebase-config.js 설정과 Firestore 규칙을 확인해 주세요.</p></div>'; });
