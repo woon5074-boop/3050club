@@ -22,7 +22,7 @@ service cloud.firestore {
       allow list: if isMember();
       allow create: if authed() && request.resource.data.status == 'pending' && request.resource.data.admin == false
         && id == request.resource.data.name + '_' + request.resource.data.last4;
-      allow update: if isAdmin() || (isMember() && id == mid() && onlyChanges(['age', 'region']));
+      allow update: if isAdmin() || (isMember() && id == mid() && onlyChanges(['age', 'region', 'notifSeenAt']));
       allow delete: if isAdmin();
     }
     // 휴대폰 번호: 운영진만 열람
@@ -38,6 +38,23 @@ service cloud.firestore {
       allow create: if isAdmin() || (isMember() && request.resource.data.memberId == mid() && id == request.resource.data.eventId + '_' + mid() && request.resource.data.get('paid', false) == false);
       allow update: if isAdmin() || (isMember() && resource.data.memberId == mid() && request.resource.data.memberId == mid() && request.resource.data.get('paid', false) == resource.data.get('paid', false));
       allow delete: if isAdmin() || (isMember() && resource.data.memberId == mid());
+    }
+    // 알림: 전체·개인·운영진 대상. 회원은 운영진에게 보내는 알림(스코어 제출 등)만, 비회원은 가입 신청 알림만 생성
+    match /notifs/{id} {
+      allow read: if isMember();
+      allow create: if isAdmin()
+        || (isMember() && request.resource.data.to == 'admins')
+        || (authed() && request.resource.data.to == 'admins' && request.resource.data.type == 'join');
+      allow delete: if isAdmin();
+    }
+    // 스코어카드: 해당 조의 조장만 제출 전까지 입력, 운영진은 항상 가능
+    match /scorecards/{id} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() || (isMember()
+        && id == request.resource.data.eventId + '_g' + string(request.resource.data.groupNo)
+        && get(/databases/$(db)/documents/events/$(request.resource.data.eventId)).data.teams[request.resource.data.groupNo - 1].marker == mid()
+        && (resource == null || resource.data.submitted != true));
+      allow delete: if isAdmin();
     }
     match /posts/{id} {
       allow read: if isMember();
