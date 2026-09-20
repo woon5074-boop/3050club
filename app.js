@@ -177,7 +177,9 @@ var SITE_URL = 'https://www.3050club.co.kr/';
 var deferredInstall = null;
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; var c = document.getElementById('installCard'); if (c) c.style.display = ''; });
 window.addEventListener('appinstalled', function () { deferredInstall = null; try { localStorage.setItem('c3050_installed', '1'); } catch (e) { } var c = document.getElementById('installCard'); if (c) c.remove(); toast('홈 화면에 추가되었습니다'); });
-if ('serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { }); }); }
+var IS_SAMSUNG = /SamsungBrowser/i.test(UA);
+if (IS_SAMSUNG && 'serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () { }); }
+if (!IS_SAMSUNG && 'serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { }); }); }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
 function openExternal() {
@@ -199,7 +201,7 @@ function installGuide() {
   var steps = IS_IOS
     ? ['화면 아래 가운데의 <b>공유 버튼</b>(네모에서 화살표가 위로 나온 모양)을 누릅니다.', '목록을 아래로 내려 <b>홈 화면에 추가</b>를 누릅니다.', '오른쪽 위 <b>추가</b>를 누르면 홈 화면에 3050클럽 아이콘이 생깁니다.']
     : /SamsungBrowser/i.test(UA)
-      ? ['화면 아래 오른쪽의 <b>줄 3개(≡) 메뉴</b>를 누릅니다.', '<b>현재 페이지 추가</b> → <b>홈 화면</b>을 누릅니다.', '<b>추가</b>를 누르면 홈 화면에 3050클럽 아이콘이 생깁니다.']
+      ? ['화면 아래 오른쪽의 <b>줄 3개(≡) 메뉴</b>를 누릅니다.', '<b>현재 페이지 추가</b>(+ 모양)를 누른 뒤 <b>홈 화면</b>을 고릅니다.', '<b>추가</b>를 누르면 홈 화면에 3050클럽 바로가기 아이콘이 생깁니다. (앱 설치가 아니라 바로가기라서 보안 경고가 뜨지 않습니다)']
       : ['화면 오른쪽 위의 <b>점 3개(⋮) 메뉴</b>를 누릅니다.', '<b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 누릅니다.', '<b>추가(설치)</b>를 누르면 홈 화면에 3050클럽 아이콘이 생깁니다.'];
   sheet('<h3>홈 화면에 저장하는 방법</h3><p class="s13 mute">' + (IS_IOS ? '아이폰 사파리' : /SamsungBrowser/i.test(UA) ? '삼성 인터넷' : '크롬') + ' 기준입니다. 한 번만 해 두면 다음부터는 아이콘만 누르면 됩니다.</p><div class="stack" style="gap:12px">' + steps.map(function (s, i) { return '<div class="row" style="align-items:flex-start;gap:12px"><span style="width:32px;height:32px;border-radius:50%;background:var(--sun);color:var(--ink);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (i + 1) + '</span><span style="padding-top:4px">' + s + '</span></div>'; }).join('') + '</div><button class="btn block" data-act="closeSheet">확인</button>');
 }
@@ -581,7 +583,7 @@ var ACT = {
     });
   },
   openExternal: function () { openExternal(); },
-  installApp: function () { if (deferredInstall) { deferredInstall.prompt(); deferredInstall.userChoice.then(function (r) { if (r.outcome === 'accepted') lsSet('c3050_installed', '1'); deferredInstall = null; }); } else installGuide(); },
+  installApp: function () { if (deferredInstall && !IS_SAMSUNG) { deferredInstall.prompt(); deferredInstall.userChoice.then(function (r) { if (r.outcome === 'accepted') lsSet('c3050_installed', '1'); deferredInstall = null; }); } else installGuide(); },
   installLater: function () { lsSet('c3050_install_later', String(Date.now())); var c = document.getElementById('installCard'); if (c) c.remove(); },
   notifOpen: function () {
     var list = S.notifs || [], seen = S.me.notifSeenAt || 0, perm = ('Notification' in window) ? Notification.permission : 'unsupported';
