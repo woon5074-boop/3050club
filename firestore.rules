@@ -32,10 +32,11 @@ service cloud.firestore {
     }
     match /events/{id} { allow read: if true; allow write: if isAdmin(); }
     match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /dues/{id} { allow read: if isMember(); allow write: if isAdmin(); }
     match /rsvps/{id} {
       allow read: if isMember();
-      allow create, update: if isAdmin() || (isMember() && request.resource.data.memberId == mid() && id == request.resource.data.eventId + '_' + mid());
+      // 회원은 본인 참석 여부만 변경 가능 — 참가비 입금 확인(paid)은 운영진만
+      allow create: if isAdmin() || (isMember() && request.resource.data.memberId == mid() && id == request.resource.data.eventId + '_' + mid() && request.resource.data.get('paid', false) == false);
+      allow update: if isAdmin() || (isMember() && resource.data.memberId == mid() && request.resource.data.memberId == mid() && request.resource.data.get('paid', false) == resource.data.get('paid', false));
       allow delete: if isAdmin() || (isMember() && resource.data.memberId == mid());
     }
     match /posts/{id} {
