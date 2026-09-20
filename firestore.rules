@@ -56,6 +56,13 @@ service cloud.firestore {
         && (resource == null || resource.data.submitted != true));
       allow delete: if isAdmin();
     }
+    // 카풀: 운전자 본인이 등록·취소, 회원은 탑승자 명단(riders)만 변경
+    match /carpools/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.driverId == mid();
+      allow update: if isAdmin() || (isMember() && (resource.data.driverId == mid() || onlyChanges(['riders'])));
+      allow delete: if isAdmin() || (isMember() && resource.data.driverId == mid());
+    }
     match /posts/{id} {
       allow read: if isMember();
       allow create: if isMember() && request.resource.data.authorId == mid() && (request.resource.data.cat != '공지' || isAdmin());
