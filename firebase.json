@@ -1,0 +1,8 @@
+{
+  "firestore": { "rules": "firestore.rules" },
+  "hosting": {
+    "public": ".",
+    "ignore": ["firebase.json", "firestore.rules", "**/.*", "설치안내.md"],
+    "headers": [{ "source": "**/*.@(jpg|svg)", "headers": [{ "key": "Cache-Control", "value": "max-age=604800" }] }]
+  }
+}

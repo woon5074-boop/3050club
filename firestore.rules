@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function authed() { return request.auth != null; }
+    function hasSession() { return authed() && exists(/databases/$(db)/documents/sessions/$(request.auth.uid)); }
+    function mid() { return get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.memberId; }
+    function me() { return get(/databases/$(db)/documents/members/$(mid())).data; }
+    function isMember() { return hasSession() && me().status == 'approved'; }
+    function isAdmin() { return isMember() && me().admin == true; }
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // 로그인 세션: 승인된 회원 문서(이름_뒷4자리)에만 연결 가능
+    match /sessions/{uid} {
+      allow read, delete: if authed() && request.auth.uid == uid;
+      allow create, update: if authed() && request.auth.uid == uid
+        && exists(/databases/$(db)/documents/members/$(request.resource.data.memberId))
+        && get(/databases/$(db)/documents/members/$(request.resource.data.memberId)).data.status == 'approved';
+    }
+    // 회원: 단건 조회는 로그인 확인용으로 허용, 목록은 승인 회원만
+    match /members/{id} {
+      allow get: if authed();
+      allow list: if isMember();
+      allow create: if authed() && request.resource.data.status == 'pending' && request.resource.data.admin == false
+        && id == request.resource.data.name + '_' + request.resource.data.last4;
+      allow update: if isAdmin() || (isMember() && id == mid() && onlyChanges(['age', 'region']));
+      allow delete: if isAdmin();
+    }
+    // 휴대폰 번호: 운영진만 열람
+    match /members_private/{id} {
+      allow create: if authed();
+      allow read, update, delete: if isAdmin();
+    }
+    match /events/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /dues/{id} { allow read: if isMember(); allow write: if isAdmin(); }
+    match /rsvps/{id} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() || (isMember() && request.resource.data.memberId == mid() && id == request.resource.data.eventId + '_' + mid());
+      allow delete: if isAdmin() || (isMember() && resource.data.memberId == mid());
+    }
+    match /posts/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.authorId == mid() && (request.resource.data.cat != '공지' || isAdmin());
+      allow update: if isAdmin() || (isMember() && (resource.data.authorId == mid() || onlyChanges(['likes', 'cc'])));
+      allow delete: if isAdmin() || (isMember() && resource.data.authorId == mid());
+    }
+    match /comments/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.authorId == mid();
+      allow delete: if isAdmin() || (isMember() && resource.data.authorId == mid());
+    }
+    match /photos/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.authorId == mid();
+      allow delete: if isAdmin() || (isMember() && resource.data.authorId == mid());
+    }
+  }
+}
